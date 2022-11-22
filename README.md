@@ -1,4 +1,4 @@
-# SQL Mini Project Using Covid Data
+# SQL Project Using Covid Data
 ## Motivation
 This project was inspired by Alex the Analyst. The goal is to use SQL to do exploratory analyst as well as create visualizations from SQL queries. 
 
