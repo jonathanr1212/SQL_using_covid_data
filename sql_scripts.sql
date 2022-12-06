@@ -1,78 +1,94 @@
-SELECT location, date, total_cases, new_cases, total_deaths, population FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
-ORDER BY 1, 2;
+SELECT location, date, total_cases, new_cases, total_deaths, population 
+FROM `covidanalysis-370814.covid_data.covid_deaths`
+ORDER BY 1,2;
 
--- Checking total cases vs total deaths
--- Shows the likelihood if you contract covid in your country
-SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 AS DeathPercentage
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
-ORDER BY 1, 2;
+-- Looking at total cases vs total deaths
+-- shows likelihood of dying if you contract covid in your country
+SELECT location, date, total_cases, total_deaths,(total_deaths/total_cases)*100 AS death_percentage 
+FROM `covidanalysis-370814.covid_data.covid_deaths`
+ORDER BY 1,2;
 
--- Looking at the total cases vs population
--- Shows what percentage of population got covid
-
-SELECT location, date, total_cases, population, (total_cases/population)*100 AS InfectionPercentage
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
+-- Looking at total cases vs total deaths for US
+-- shows likelihood of dying if you contract covid in the US
+SELECT location, date, total_cases, total_deaths,(total_deaths/total_cases)*100 AS death_percentage 
+FROM `covidanalysis-370814.covid_data.covid_deaths`
 WHERE location LIKE '%States%'
-ORDER BY 1, 2;
+ORDER BY 1,2;
+
+-- Looking at total cases vs population
+-- shows what percentage of population caught covid in the US
+SELECT location, date, total_cases, population,(total_cases/population)*100 AS infection_percentage 
+FROM `covidanalysis-370814.covid_data.covid_deaths`
+WHERE location LIKE '%States%'
+ORDER BY 1,2;
 
 -- Looking at countries with highest infection rate compared to population
-
-SELECT location,population, MAX(total_cases) AS HighestInfectionCount,  MAX((total_cases/population))*100 AS InfectionPercentage
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
+SELECT location, population, MAX(total_cases) AS highest_infection_count,MAX((total_cases/population))*100 AS infection_percentage 
+FROM `covidanalysis-370814.covid_data.covid_deaths`
 GROUP BY location, population
-ORDER BY InfectionPercentage DESC;
-
+ORDER BY infection_percentage DESC;
 
 -- Showing countries with the highest death count per population
-
-SELECT location, MAX(total_deaths) AS TotalDeathCount
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
+SELECT location, MAX(total_deaths) AS total_death_count
+FROM `covidanalysis-370814.covid_data.covid_deaths`
 WHERE continent IS NOT NULL
 GROUP BY location
-ORDER BY TotalDeathCount DESC;
+ORDER BY total_death_count DESC;
 
--- Let's see what happens when we look death counts at it by continent
-SELECT continent, MAX(total_deaths) AS TotalDeathCount
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
+-- Showing the continents with the highest death counts
+SELECT continent, MAX(total_deaths) AS total_death_count
+FROM `covidanalysis-370814.covid_data.covid_deaths`
 WHERE continent IS NOT NULL
 GROUP BY continent
-ORDER BY TotalDeathCount DESC;
+ORDER BY total_death_count DESC;
 
--- Looking at global numbers per day
-SELECT date, SUM(new_cases) AS total_cases, SUM(new_deaths) AS total_deaths, (SUM(new_deaths)/SUM(new_cases))*100 AS DeathPercentage
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
+-- Global numbers
+-- By day
+SELECT date, SUM(new_cases)AS total_cases, SUM(new_deaths) AS total_deaths, SUM(new_deaths)/SUM(new_cases)*100 AS death_percentage
+FROM `covidanalysis-370814.covid_data.covid_deaths`
 WHERE continent IS NOT NULL
 GROUP BY date
-ORDER BY 1, 2;
+ORDER BY 1,2;
 
--- Looking at global numbers total
-SELECT SUM(new_cases) AS total_cases, SUM(new_deaths) AS total_deaths, (SUM(new_deaths)/SUM(new_cases))*100 AS DeathPercentage
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations` 
+-- Overall
+SELECT SUM(new_cases)AS total_cases, SUM(new_deaths) AS total_deaths, SUM(new_deaths)/SUM(new_cases)*100 AS death_percentage
+FROM `covidanalysis-370814.covid_data.covid_deaths`
 WHERE continent IS NOT NULL
-ORDER BY 1, 2;
+ORDER BY 1,2;
 
--- Looking at total population vs vaccinations
-SELECT continent, location, date, population, new_vaccinations
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations`
-WHERE continent IS NOT NULL
+-- Looking at total population vs vaccination
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date) AS rolling_people_vaccinated
+FROM `covidanalysis-370814.covid_data.covid_deaths` AS dea
+JOIN `covidanalysis-370814.covid_data.covid_vaccinations` AS vac
+  ON dea.location = vac.location
+  AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
 ORDER BY 2,3;
 
--- Checking rolling count for each location
-SELECT continent, location, date, population, new_vaccinations,
-SUM(new_vaccinations) 
-OVER(PARTITION BY location
-ORDER BY location, date) AS RollingPeopleVaccinated,
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations`
-WHERE continent IS NOT NULL
-ORDER BY 2,3;
+-- Using a CTE
 
--- Using CTE
-WITH PopvsVac AS 
-(SELECT continent, location, date, population, new_vaccinations,
-SUM(new_vaccinations) 
-OVER(PARTITION BY location
-ORDER BY location, date) AS RollingPeopleVaccinated,
-FROM `fluted-bot-365817.covid_data.covid_deaths_and_vaccinations`
-WHERE continent IS NOT NULL)
-SELECT continent, location, date, population,new_vaccinations, RollingPeopleVaccinated, (RollingPeopleVaccinated/population)*100
+WITH PopvsVac AS( 
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date) AS rolling_people_vaccinated
+FROM `covidanalysis-370814.covid_data.covid_deaths` AS dea
+JOIN `covidanalysis-370814.covid_data.covid_vaccinations` AS vac
+  ON dea.location = vac.location
+  AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+)
+
+SELECT *, (rolling_people_vaccinated/population)*100
 FROM PopvsVac;
+
+-- Using a temp table
+CREATE TEMP TABLE  percent_population_vaccinated AS(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations, SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date) AS rolling_people_vaccinated
+FROM `covidanalysis-370814.covid_data.covid_deaths` AS dea
+JOIN `covidanalysis-370814.covid_data.covid_vaccinations` AS vac
+  ON dea.location = vac.location
+  AND dea.date = vac.date
+WHERE dea.continent IS NOT NULL
+);
+
+SELECT *, (rolling_people_vaccinated/population)*100
+FROM percent_population_vaccinated;
